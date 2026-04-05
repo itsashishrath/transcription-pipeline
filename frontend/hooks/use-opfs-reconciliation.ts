@@ -37,7 +37,7 @@ async function listOPFSChunks(
   }
 
   const files: Array<{ seqNo: number; blob: Blob }> = []
-  for await (const [name, handle] of sessionDir.entries()) {
+  for await (const [name, handle] of (sessionDir as any).entries()) {
     if (handle.kind !== "file") continue
     const match = name.match(/^chunk-(\d+)\.wav$/)
     if (!match) continue
