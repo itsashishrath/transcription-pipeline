@@ -15,7 +15,7 @@ export async function readSessionFromOPFS(sessionId: string): Promise<OPFSChunk[
     const sessionDir = await root.getDirectoryHandle(sessionId)
     const chunks: OPFSChunk[] = []
 
-    for await (const [name, handle] of sessionDir.entries()) {
+    for await (const [name, handle] of (sessionDir as any).entries()) {
       if (handle.kind !== "file") continue
       const match = name.match(/^chunk-(\d+)\.wav$/)
       if (!match) continue
