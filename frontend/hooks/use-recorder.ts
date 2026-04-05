@@ -104,11 +104,56 @@ export function useRecorder({ chunkDuration = 5, sessionId }: UseRecorderOptions
   const startTimeRef = useRef(0)
   const statusRef = useRef<RecorderStatus>("idle")
   const sessionIdRef = useRef<string | undefined>(sessionId)
+  const chunksRef = useRef<WavChunk[]>([])
 
   statusRef.current = status
   sessionIdRef.current = sessionId
 
   const chunkThreshold = SAMPLE_RATE * chunkDuration
+
+  // Keep chunksRef in sync so retry callbacks always see current state
+  useEffect(() => { chunksRef.current = chunks }, [chunks])
+
+  // Retry failed chunks — called on interval and when the browser comes back online
+  const retryFailedChunks = useCallback(async () => {
+    const sid = sessionIdRef.current
+    if (!sid) return
+    const failed = chunksRef.current.filter((c) => c.uploadError && !c.serverAcked)
+    if (failed.length === 0) return
+
+    for (const chunk of failed) {
+      // Clear error so the UI shows it as pending again
+      setChunks((prev) =>
+        prev.map((c) => (c.id === chunk.id ? { ...c, uploadError: false } : c)),
+      )
+      try {
+        await uploadChunk({
+          chunkId: chunk.id,
+          sessionId: sid,
+          seqNo: chunk.seqNo,
+          blob: chunk.blob,
+          durationMs: Math.round(chunk.duration * 1000),
+        })
+        setChunks((prev) =>
+          prev.map((c) => (c.id === chunk.id ? { ...c, serverAcked: true } : c)),
+        )
+      } catch {
+        setChunks((prev) =>
+          prev.map((c) => (c.id === chunk.id ? { ...c, uploadError: true } : c)),
+        )
+      }
+    }
+  }, [])
+
+  // Retry every 10 seconds and immediately when the network comes back
+  useEffect(() => {
+    const interval = setInterval(retryFailedChunks, 10_000)
+    window.addEventListener("online", retryFailedChunks)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener("online", retryFailedChunks)
+    }
+  }, [retryFailedChunks])
 
   // Called each time a full chunk is ready
   const handleChunk = useCallback(async (blob: Blob, seqNo: number, duration: number) => {

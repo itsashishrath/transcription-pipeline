@@ -33,6 +33,13 @@ export interface UploadChunkParams {
   durationMs: number
 }
 
+export async function getAckedSeqNos(sessionId: string): Promise<number[]> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/chunks`)
+  if (!res.ok) throw new Error(`Failed to fetch chunk list: ${res.status}`)
+  const data = await res.json()
+  return data.acked_seq_nos as number[]
+}
+
 export async function uploadChunk(params: UploadChunkParams): Promise<void> {
   const form = new FormData()
   form.append("audio", params.blob, `chunk-${params.seqNo}.wav`)

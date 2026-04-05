@@ -39,3 +39,7 @@ class UtteranceResponse(BaseModel):
 class TranscriptResponse(BaseModel):
     status: str
     utterances: list[UtteranceResponse]
+
+
+class ChunksResponse(BaseModel):
+    acked_seq_nos: list[int]

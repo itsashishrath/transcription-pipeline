@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
 import uuid
 
 from database import get_db
 from models import Session, Chunk
-from schemas import SessionResponse, SessionListItem
+from schemas import SessionResponse, SessionListItem, ChunksResponse
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -39,3 +39,15 @@ def list_sessions(db: DBSession = Depends(get_db)):
             )
         )
     return result
+
+
+@router.get("/{session_id}/chunks", response_model=ChunksResponse)
+def get_session_chunks(session_id: str, db: DBSession = Depends(get_db)):
+    session = db.query(Session).filter(Session.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    seq_nos = [
+        c.seq_no
+        for c in db.query(Chunk.seq_no).filter(Chunk.session_id == session_id).all()
+    ]
+    return {"acked_seq_nos": seq_nos}

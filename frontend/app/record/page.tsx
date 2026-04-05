@@ -1,9 +1,14 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createSession, triggerTranscription } from "@/lib/api"
 import { useRecorder } from "@/hooks/use-recorder"
+import {
+  useOpfsReconciliation,
+  saveSessionToStorage,
+  clearSessionFromStorage,
+} from "@/hooks/use-opfs-reconciliation"
 
 function formatTime(secs: number): string {
   const h = Math.floor(secs / 3600)
@@ -20,6 +25,13 @@ export default function RecordPage() {
   const [transcribing, setTranscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const { state: recovery, checkForPendingSession, recover, discard } = useOpfsReconciliation()
+
+  // Check for a session left over from a previous tab close / reload
+  useEffect(() => {
+    checkForPendingSession()
+  }, [checkForPendingSession])
+
   const { status, start, stop, chunks, elapsed } = useRecorder({
     chunkDuration: 5,
     sessionId: sessionId ?? undefined,
@@ -31,6 +43,7 @@ export default function RecordPage() {
     try {
       const id = await createSession()
       setSessionId(id)
+      saveSessionToStorage(id)   // survive a tab close / reload
       await start()
     } catch (e: unknown) {
       setError(String(e))
@@ -48,6 +61,7 @@ export default function RecordPage() {
     setTranscribing(true)
     setError(null)
     try {
+      clearSessionFromStorage()  // session is now safely handed off
       await triggerTranscription(sessionId)
       router.push(`/sessions/${sessionId}`)
     } catch (e: unknown) {
@@ -65,6 +79,52 @@ export default function RecordPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+      {/* Recovery banner — shown when a previous session survived a tab close */}
+      {recovery.pendingSessionId && !recovery.done && (
+        <div className="w-full max-w-lg mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm font-medium text-amber-800 mb-1">Unfinished session found</p>
+          <p className="text-xs text-amber-600 mb-3">
+            {recovery.opfsChunkCount} chunk{recovery.opfsChunkCount !== 1 ? "s" : ""} saved locally
+            from a previous session were not uploaded. Re-upload them before transcribing.
+          </p>
+          {recovery.error && (
+            <p className="text-xs text-red-600 mb-2">{recovery.error}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={recover}
+              disabled={recovery.recovering}
+              className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {recovery.recovering
+                ? `Uploading… (${recovery.uploadedCount}/${recovery.opfsChunkCount})`
+                : "Re-upload chunks"}
+            </button>
+            <button
+              onClick={discard}
+              disabled={recovery.recovering}
+              className="border border-amber-300 hover:bg-amber-100 disabled:opacity-50 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {recovery.done && (
+        <div className="w-full max-w-lg mb-4 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
+          <p className="text-sm text-green-700">
+            Recovery complete — all chunks uploaded to server.
+          </p>
+          <button
+            onClick={() => router.push(`/sessions/${recovery.pendingSessionId ?? ""}`)}
+            className="text-xs text-green-700 underline ml-4 whitespace-nowrap"
+          >
+            View session
+          </button>
+        </div>
+      )}
+
       <div className="w-full max-w-lg bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
         <h1 className="text-xl font-bold text-gray-900 mb-1">New Recording</h1>
         <p className="text-sm text-gray-500 mb-8">
