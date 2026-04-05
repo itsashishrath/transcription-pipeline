@@ -87,7 +87,7 @@ export default function SessionPage() {
         }
 
         // Now retry — server has the files again
-        setRetryStatus("Submitting to AssemblyAI…")
+        setRetryStatus("Submitting for transcription…")
         await retryTranscription(id)
       }
 
@@ -159,7 +159,7 @@ export default function SessionPage() {
                 <p className="text-xs text-red-500 mt-1">
                   {retryStatus
                     ? retryStatus
-                    : "The audio chunks are still saved. You can retry — this will re-submit the same audio to AssemblyAI without re-recording."}
+                    : "The audio chunks are still saved. You can retry — this will re-submit the same audio to the service without re-recording."}
                 </p>
               </div>
               <button

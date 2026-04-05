@@ -112,7 +112,7 @@ export default function RecordPage() {
                 disabled={transcribing || ackedCount === 0}
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-6 py-3 rounded-lg transition-colors"
               >
-                {transcribing ? "Submitting…" : "Transcribe with AssemblyAI"}
+                {transcribing ? "Submitting…" : "Transcribe"}
               </button>
               <button
                 onClick={() => {
